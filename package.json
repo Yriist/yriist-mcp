@@ -1,0 +1,50 @@
+{
+  "name": "@yriist/mcp",
+  "version": "1.0.0",
+  "description": "ЮрИИст MCP: ИИ-юрист по праву РФ для любого MCP-клиента (Claude, Cursor, VS Code, Windsurf, ChatGPT, Zed…). Stdio-мост к https://app.yriist.ru/api/mcp с входом через OAuth.",
+  "type": "module",
+  "bin": {
+    "yriist-mcp": "bin/yriist-mcp.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node bin/yriist-mcp.mjs",
+    "docs:tools": "node scripts/gen-tools-doc.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude",
+    "cursor",
+    "legal",
+    "law",
+    "russia",
+    "yriist"
+  ],
+  "homepage": "https://yriist.ru",
+  "bugs": {
+    "url": "https://github.com/Yriist/yriist-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yriist/yriist-mcp.git"
+  },
+  "license": "MIT",
+  "author": "ЮрИИст <support@yriist.ru>",
+  "publishConfig": {
+    "access": "public"
+  },
+  "mcpName": "ru.yriist/yriist"
+}

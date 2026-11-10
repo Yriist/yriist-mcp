@@ -1,0 +1,38 @@
+name: Ошибка
+description: Мост, вход или подключение клиента работают не так
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Вопросы о качестве ответов и тарифах — в поддержку: support@yriist.ru.
+        Уязвимости — по SECURITY.md, не сюда. Не вставляйте токены (`yrp_…`, `yrt_…`, `yrr_…`).
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Что вы сделали, что ожидали и что получили. Текст ошибки из stderr — целиком.
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP-клиент и его версия
+      placeholder: Claude Desktop 1.2, Cursor 2.0, Zed…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия пакета, Node.js и ОС
+      description: "`npx -y @yriist/mcp --version`, `node -v`"
+      placeholder: "@yriist/mcp 1.0.0, Node 22.11, macOS 15"
+    validations:
+      required: true
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Вход
+      options: [OAuth (браузер), Личный токен, Не знаю]
+    validations:
+      required: true

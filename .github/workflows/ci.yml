@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [18, 20, 22, 24]
+        include:
+          - os: macos-latest
+            node: 22
+          - os: windows-latest
+            node: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - run: node bin/yriist-mcp.mjs --version
+      - run: npm pack --dry-run
+
+  manifest:
+    name: server.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Versions agree and the registry's limits hold
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const server = require("./server.json");
+            const fail = (text) => { console.error(text); process.exit(1); };
+            if (server.version !== pkg.version) fail("server.json version != package.json version");
+            if (server.packages[0].version !== pkg.version) fail("server.json package version != package.json version");
+            if (server.packages[0].identifier !== pkg.name) fail("server.json package identifier != package name");
+            if (server.name !== pkg.mcpName) fail("server.json name != package.json mcpName");
+            if ([...server.description].length > 100) fail("server.json description is over 100 characters");
+          '
