@@ -11,6 +11,8 @@
     "src",
     "docs",
     "README.md",
+    "README.en.md",
+    "LEGAL.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
@@ -42,7 +44,7 @@
     "url": "git+https://github.com/Yriist/yriist-mcp.git"
   },
   "license": "MIT",
-  "author": "ЮрИИст <support@yriist.ru>",
+  "author": "ООО «ЮрИИст» <support@yriist.ru> (https://yriist.ru)",
   "publishConfig": {
     "access": "public"
   },
