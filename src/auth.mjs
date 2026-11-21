@@ -6,6 +6,7 @@ import {
   loadCredentials,
   personalToken,
   saveCredentials,
+  updateCredentials,
 } from "./store.mjs";
 import { VERSION } from "./version.mjs";
 
@@ -14,7 +15,8 @@ import { VERSION } from "./version.mjs";
  * resource metadata (RFC 9728) → authorization server metadata (RFC 8414) →
  * dynamic client registration (RFC 7591) → authorization code + PKCE S256 in
  * the browser, answered on a loopback port (RFC 8252) → refresh tokens.
- * Works with any spec-compliant server; defaults fit ЮрИИст.
+ * Written to the MCP authorization spec, defaults fit ЮрИИст; tested
+ * against ЮрИИст's own server only.
  */
 
 export const CLIENT_NAME = "ЮрИИст MCP (stdio)";
@@ -27,6 +29,42 @@ const REQUEST_TIMEOUT_MS = 30 * 1000;
 const b64url = (buffer) => Buffer.from(buffer).toString("base64url");
 const trimSlash = (value) => String(value).replace(/\/+$/, "");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Scopes as the server names them: `research,read` → `yriist:research
+ * yriist:read`; a name with a colon is kept as is.
+ */
+export function normalizeScopes(value) {
+  const list = Array.isArray(value) ? value : String(value ?? "").split(/[\s,]+/);
+  const out = [];
+  for (const raw of list) {
+    const item = String(raw).trim();
+    if (!item) continue;
+    const scope = item.includes(":") ? item : `yriist:${item}`;
+    if (!out.includes(scope)) out.push(scope);
+  }
+  return out;
+}
+
+/**
+ * RFC 8252: a loopback redirect is matched on any port, so a registration
+ * made for one free port serves the next one too.
+ */
+function sameLoopbackClient(registered, wanted) {
+  try {
+    const a = new URL(registered);
+    const b = new URL(wanted);
+    return (
+      a.protocol === "http:" &&
+      b.protocol === "http:" &&
+      a.hostname === "127.0.0.1" &&
+      b.hostname === "127.0.0.1" &&
+      a.pathname === b.pathname
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function pkcePair() {
   const verifier = b64url(randomBytes(48));
@@ -348,6 +386,7 @@ function waitForCode({ server, redirectUri, state, meta, signal, start }) {
 /**
  * Interactive sign-in: a loopback server, the browser on the consent page,
  * the code exchanged for tokens. Resolves the saved credentials.
+ * `options.scope`: the rights to ask for (default: every one the server has).
  */
 export async function login(mcpUrl, options = {}) {
   const fetchImpl = options.fetch ?? fetch;
@@ -360,8 +399,8 @@ export async function login(mcpUrl, options = {}) {
   });
   const previous = (await loadCredentials(origin, env)) ?? {};
 
-  // Reuse the registered loopback port when it is free (the client id
-  // belongs to that redirect URI); else a new port and a new registration.
+  // Reuse the registered loopback port when it is free; on another port the
+  // same registration still serves (loopback matches any port).
   const preferredPort = previous.redirectUri
     ? Number(new URL(previous.redirectUri).port)
     : 0;
@@ -371,7 +410,7 @@ export async function login(mcpUrl, options = {}) {
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   const { verifier, challenge } = pkcePair();
   try {
-    if (!clientId || previous.redirectUri !== redirectUri) {
+    if (!clientId || !sameLoopbackClient(previous.redirectUri, redirectUri)) {
       clientId = await registerClient(meta, redirectUri, fetchImpl);
       // Kept at once, so a sign-in the person abandons isn't registered
       // again next time. A working sign-in is replaced only by a finished one.
@@ -389,8 +428,9 @@ export async function login(mcpUrl, options = {}) {
     authorize.searchParams.set("code_challenge_method", "S256");
     authorize.searchParams.set("state", state);
     authorize.searchParams.set("resource", meta.resource);
-    if (meta.scopes.length > 0) {
-      authorize.searchParams.set("scope", meta.scopes.join(" "));
+    const scopes = options.scope ? normalizeScopes(options.scope) : meta.scopes;
+    if (scopes.length > 0) {
+      authorize.searchParams.set("scope", scopes.join(" "));
     }
 
     code = await waitForCode({
@@ -513,17 +553,23 @@ async function rotate(mcpUrl, origin, credentials, { env, fetchImpl }) {
       }
     }
     // Revoked or expired: forget the tokens. An unknown client is forgotten
-    // whole, so the next sign-in registers anew.
-    await saveCredentials(
+    // whole, so the next sign-in registers anew. Checked again under the
+    // lock: a winner that saved after the last look keeps its tokens.
+    const left = await updateCredentials(
       origin,
-      error.oauthError === "invalid_client"
-        ? null
-        : {
-            clientId: credentials.clientId,
-            redirectUri: credentials.redirectUri,
-          },
+      (current) => {
+        if (current?.refreshToken && current.refreshToken !== credentials.refreshToken) {
+          return undefined;
+        }
+        return error.oauthError === "invalid_client"
+          ? null
+          : { clientId: credentials.clientId, redirectUri: credentials.redirectUri };
+      },
       env,
     );
+    if (left?.accessToken && left.refreshToken !== credentials.refreshToken) {
+      return left;
+    }
     return null;
   }
 }

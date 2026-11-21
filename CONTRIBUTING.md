@@ -27,8 +27,11 @@ node bin/yriist-mcp.mjs --help
 Тесты (`node:test`) поднимают мок-сервер OAuth + MCP и не ходят в сеть. На
 каждое изменение поведения — тест.
 
-`docs/tools.md` не правится руками: он собирается из `tools/list` сервера
-командой `npm run docs:tools` (нужен вход со всеми правами).
+`docs/tools.json` и `docs/tools.md` не правятся руками: они собираются из
+`tools/list` сервера командой `npm run docs:tools` (нужен вход со всеми
+правами). CI проверяет, что `docs/tools.md` совпадает со снимком
+`docs/tools.json`; еженедельная задача `tools-doc.yml` сверяет снимок с
+сервером (секрет `YRIIST_DOCS_TOKEN`).
 
 ## Правила кода
 

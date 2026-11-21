@@ -1,28 +1,82 @@
 name: Release
 
-# Publishes @yriist/mcp to npm when a GitHub release is published.
-# Needs npm trusted publishing set up for this repository (npmjs.com →
-# package settings → Trusted Publisher), or an NPM_TOKEN repository secret.
+# Publishes @yriist/mcp to npm, then server.json to the MCP registry, when a
+# GitHub release is published (tag vX.Y.Z = package.json version).
+#
+# npm: trusted publishing (npmjs.com → package settings → Trusted Publisher →
+# this repository and workflow), or an NPM_TOKEN repository secret. With no
+# NPM_TOKEN no token is written anywhere, so it can't shadow trusted
+# publishing (npm ≥ 11.5.1; Node 24 ships it).
+#
+# MCP registry (name ru.yriist/yriist): DNS authentication of yriist.ru.
+# Once: `openssl genpkey -algorithm Ed25519 -out key.pem` (OpenSSL 3), a TXT
+# record on the apex yriist.ru: `v=MCPv1; k=ed25519; p=<base64 public key>`,
+# and the hex private key in the MCP_PRIVATE_KEY secret:
+#   openssl pkey -in key.pem -noout -text | sed -n '/priv:/,/pub:/p' | sed '1d;$d' | tr -d ' :\n'
+# Without the secret the registry job says so and stops.
 on:
   release:
     types: [published]
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  publish:
+  npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
       - name: The tag is the package version
         run: test "v$(node -p 'require("./package.json").version')" = "${GITHUB_REF_NAME}"
       - run: npm test
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish (trusted publishing)
+        if: env.NPM_TOKEN == ''
+        run: npm publish --provenance --access public
+      - name: Publish (NPM_TOKEN)
+        if: env.NPM_TOKEN != ''
+        run: |
+          npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
+          npm publish --provenance --access public
+
+  registry:
+    needs: npm
+    runs-on: ubuntu-latest
+    env:
+      MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+      MCP_PUBLISHER_VERSION: v1.8.1
+    steps:
+      - name: No key
+        if: env.MCP_PRIVATE_KEY == ''
+        run: echo "::notice::MCP_PRIVATE_KEY is not set; server.json is not published to the MCP registry"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: env.MCP_PRIVATE_KEY != ''
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        if: env.MCP_PRIVATE_KEY != ''
+      - name: Download and verify mcp-publisher
+        if: env.MCP_PRIVATE_KEY != ''
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          archive="mcp-publisher_${os}_${arch}.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" "$archive"
+          tar xzf "$archive" mcp-publisher
+      - name: Sign in to the MCP registry (DNS, yriist.ru)
+        if: env.MCP_PRIVATE_KEY != ''
+        run: ./mcp-publisher login dns --domain yriist.ru
+      - name: Publish server.json
+        if: env.MCP_PRIVATE_KEY != ''
+        run: ./mcp-publisher publish

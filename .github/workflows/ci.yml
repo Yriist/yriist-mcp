@@ -23,8 +23,8 @@ jobs:
           - os: windows-latest
             node: 22
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
       - run: npm test
@@ -35,8 +35,8 @@ jobs:
     name: server.json
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
       - name: Versions agree and the registry's limits hold
@@ -51,3 +51,12 @@ jobs:
             if (server.name !== pkg.mcpName) fail("server.json name != package.json mcpName");
             if ([...server.description].length > 100) fail("server.json description is over 100 characters");
           '
+      # docs/tools.md is rendered from the committed tools/list snapshot; the
+      # snapshot itself is checked against the live server by tools-doc.yml.
+      - name: docs/tools.md matches docs/tools.json
+        run: |
+          if [ -f docs/tools.json ]; then
+            node scripts/gen-tools-doc.mjs --offline --check
+          else
+            echo "::warning::docs/tools.json is missing: run npm run docs:tools against a server with every scope"
+          fi

@@ -3,7 +3,7 @@
   "name": "ru.yriist/yriist",
   "title": "ЮрИИст",
   "description": "ИИ-юрист по праву РФ: судебная практика, нормы, контрагенты, расчёты, документы и сроки.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "websiteUrl": "https://yriist.ru",
   "repository": {
     "url": "https://github.com/Yriist/yriist-mcp",
@@ -19,7 +19,7 @@
     {
       "registryType": "npm",
       "identifier": "@yriist/mcp",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" },
       "environmentVariables": [
@@ -27,6 +27,16 @@
           "name": "YRIIST_TOKEN",
           "description": "Личный токен (yrp_…) вместо входа через браузер",
           "isSecret": true,
+          "isRequired": false
+        },
+        {
+          "name": "YRIIST_MCP_URL",
+          "description": "Другой адрес сервера (по умолчанию https://app.yriist.ru/api/mcp)",
+          "isRequired": false
+        },
+        {
+          "name": "YRIIST_NO_BROWSER",
+          "description": "1 — не открывать браузер при входе: ссылка выводится в stderr",
           "isRequired": false
         }
       ]

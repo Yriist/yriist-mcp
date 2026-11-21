@@ -1,0 +1,3600 @@
+[
+  {
+    "name": "ask_yriist",
+    "title": "Спросить ИИ-юриста ЮрИИста",
+    "description": "Задаёт вопрос ИИ-юристу ЮрИИста — полноценный юридический агент по праву РФ: сам ищет практику и нормы, проверяет ссылки, считает сроки и суммы, читает приложенные файлы, составляет и правит документы. Ответ сохраняется чатом в ЮрИИсте. Расходует одно сообщение тарифа.\n- Продолжение разговора — chat_id (тогда дело чата не меняется: project_id только для нового чата).\n- Файлы пользователя (договор, решение суда) — file_ids из file_upload / files_list: ЮрИИст прочитает их сам.\n- Правка существующего документа («поправь п. 3.2») — document_id: ЮрИИст изменит этот документ, появится новая версия.\n- Вопрос по делу — project_id: ЮрИИст учтёт «О деле», файлы и факты дела.\nОтвет может готовиться несколько минут, составление документа — почти всегда дольше ожидания: при status=running вызови chat_read с chat_id позже — там будут ответ и document_id созданных документов. Отмена вызова до отправки вопроса ничего не списывает; после — ответ дописывается и сохраняется в чате (сообщение списано), прочитать его — chat_read, остановить — chat_stop. Для точечных проверок есть court_search, law_article, calculate_*.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 20000,
+          "description": "Вопрос или задача на русском, со всеми фактами: даты, суммы, стороны, регион."
+        },
+        "chat_id": {
+          "description": "Продолжить существующий чат ЮрИИста (уточнение, следующий шаг).",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "project_id": {
+          "description": "Новый чат — в этом деле («Дела», projects_list).",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "file_ids": {
+          "description": "Файлы, которые ЮрИИст должен прочитать (до 10).",
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          }
+        },
+        "document_id": {
+          "description": "Документ из «Документов», о котором вопрос или который править.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "audience": {
+          "description": "lawyer — ответ для юриста (нормы, практика, терминология); general — простым языком. По умолчанию — как в профиле пользователя.",
+          "type": "string",
+          "enum": [
+            "lawyer",
+            "general"
+          ]
+        },
+        "deep_research": {
+          "description": "Глубокое исследование: дольше и подробнее (если доступно на тарифе).",
+          "type": "boolean"
+        },
+        "wait_seconds": {
+          "description": "Сколько ждать ответа (по умолчанию 170 с). Потом — chat_read.",
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 280
+        }
+      },
+      "required": [
+        "question"
+      ]
+    },
+    "annotations": {
+      "title": "Спросить ИИ-юриста ЮрИИста",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:agent",
+      "yriist/scope": "yriist:agent",
+      "ui": {
+        "resourceUri": "ui://yriist/answer.html"
+      },
+      "ui/resourceUri": "ui://yriist/answer.html",
+      "openai/outputTemplate": "ui://yriist/answer.html"
+    }
+  },
+  {
+    "name": "whoami",
+    "title": "Мой аккаунт ЮрИИста",
+    "description": "Аккаунт ЮрИИста, к которому подключено это приложение: имя, тариф, сколько сообщений осталось в этом месяце, какие возможности открыты на тарифе (документы, дела, табличный анализ, глубокий поиск, скачивание файлов), лимиты хранилища и выданные права подключения. Вызывай, чтобы заранее понять, что пользователь может сделать в ЮрИИсте, или когда он спрашивает про свой тариф.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Мой аккаунт ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/account.html"
+      },
+      "ui/resourceUri": "ui://yriist/account.html",
+      "openai/outputTemplate": "ui://yriist/account.html"
+    }
+  },
+  {
+    "name": "chats_list",
+    "title": "Чаты ЮрИИста",
+    "description": "Чаты пользователя с ИИ-юристом ЮрИИста (личное пространство), новые первыми: id, название, дата, дело, идёт ли ответ сейчас. Фильтры: слова из названия (query), дело (project_id). Текст чата — chat_read; поиск по словам внутри переписки — chats_search.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Слова из названия чата.",
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "project_id": {
+          "description": "Только чаты этого дела.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "offset": {
+          "description": "Пропустить столько чатов (страницы; не с query).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "annotations": {
+      "title": "Чаты ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "chat_read",
+    "title": "Прочитать чат",
+    "description": "Текст чата с ЮрИИстом в Markdown (вопросы пользователя и ответы ЮрИИста), документы, созданные в чате (document_id), приложенные файлы (file_id) и идёт ли ответ сейчас (status=running). Так же проверяется ответ после ask_yriist со status=running. Длинный чат приходит последними сообщениями; более ранние — from_message.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "chat_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 200000
+        },
+        "from_message": {
+          "description": "Номер сообщения (с 0), с которого читать вперёд. Без него — последние сообщения.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "chat_id"
+      ]
+    },
+    "annotations": {
+      "title": "Прочитать чат",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/answer.html"
+      },
+      "ui/resourceUri": "ui://yriist/answer.html",
+      "openai/outputTemplate": "ui://yriist/answer.html",
+      "anthropic/maxResultSizeChars": 200000
+    }
+  },
+  {
+    "name": "chats_search",
+    "title": "Поиск по чатам",
+    "description": "Полнотекстовый поиск по переписке пользователя с ЮрИИстом (русская морфология): найдёт, где обсуждались слова, суммы, стороны. Возвращает фрагменты и chat_id. Можно ограничить делом (project_id).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "annotations": {
+      "title": "Поиск по чатам",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "chat_stop",
+    "title": "Остановить ответ",
+    "description": "Останавливает ответ ЮрИИста, который ещё готовится в чате (после ask_yriist со status=running), — например, если вопрос задан неверно. Уже написанная часть сохранится. Сообщение тарифа уже потрачено.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "chat_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "chat_id"
+      ]
+    },
+    "annotations": {
+      "title": "Остановить ответ",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:agent",
+      "yriist/scope": "yriist:agent",
+      "ui": {
+        "resourceUri": "ui://yriist/answer.html"
+      },
+      "ui/resourceUri": "ui://yriist/answer.html",
+      "openai/outputTemplate": "ui://yriist/answer.html"
+    }
+  },
+  {
+    "name": "chat_delete",
+    "title": "Удалить чат",
+    "description": "Удаляет чат пользователя в ЮрИИсте безвозвратно: переписку, файлы, приложенные только к этому чату, и факты памяти этого чата. Документы, созданные в чате, остаются в «Документах». Только по явной просьбе пользователя удалить чат.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "chat_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "chat_id"
+      ]
+    },
+    "annotations": {
+      "title": "Удалить чат",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "projects_list",
+    "title": "Дела",
+    "description": "Дела пользователя в «Делах» ЮрИИста (личное пространство) — папки для клиентского дела или спора, где лежат чаты, файлы, документы, сроки и судебные дела. Новые по активности первыми; поиск по названию. Содержимое дела — project_read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Слова из названия дела.",
+          "type": "string",
+          "maxLength": 100
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "description": "next_cursor прошлой страницы.",
+          "type": "string",
+          "maxLength": 400
+        }
+      }
+    },
+    "annotations": {
+      "title": "Дела",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "project_read",
+    "title": "Дело",
+    "description": "Всё о деле из «Дел» ЮрИИста: «О деле» (номер, суд, стороны, описание), чаты, файлы (file_id), документы (document_id), сроки и отслеживаемые судебные дела (case_id).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "project_id"
+      ]
+    },
+    "annotations": {
+      "title": "Дело",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "project_create",
+    "title": "Создать дело",
+    "description": "Создаёт дело в «Делах» ЮрИИста (папку для клиентского дела или спора) с «О деле»: номер, суд, стороны, описание — их ЮрИИст учитывает в каждом чате дела. Если дело с таким названием уже есть, вернёт его. Потом в дело можно класть файлы (file_upload с project_id), документы, сроки и вопросы (ask_yriist с project_id). Доступно на платных тарифах.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "description": "Суть дела в нескольких фразах.",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "details": {
+          "type": "object",
+          "properties": {
+            "case_number": {
+              "description": "Номер дела: «А40-12345/2026».",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "court": {
+              "description": "Суд или орган.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "our_side": {
+              "description": "Наша сторона: «Истец — ООО «Ромашка»».",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "other_side": {
+              "description": "Другая сторона.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "annotations": {
+      "title": "Создать дело",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "project_update",
+    "title": "Изменить дело",
+    "description": "Переименовывает дело или меняет «О деле» (описание, номер, суд, наша и другая сторона). Указанные поля заменяются, остальные остаются; пустая строка или null — стереть поле.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 4000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "details": {
+          "type": "object",
+          "properties": {
+            "case_number": {
+              "description": "Номер дела: «А40-12345/2026».",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "court": {
+              "description": "Суд или орган.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "our_side": {
+              "description": "Наша сторона: «Истец — ООО «Ромашка»».",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "other_side": {
+              "description": "Другая сторона.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "project_id"
+      ]
+    },
+    "annotations": {
+      "title": "Изменить дело",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "project_delete",
+    "title": "Удалить дело",
+    "description": "Удаляет дело из «Дел» безвозвратно: ВСЕ файлы дела (из хранилища) и память дела. Чаты дела по умолчанию остаются без дела (chats=keep), chats=delete удаляет и их. Документы остаются в «Документах». Только по явной просьбе пользователя удалить дело; confirm_name — точное название дела, как в projects_list.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "confirm_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "chats": {
+          "type": "string",
+          "enum": [
+            "keep",
+            "delete"
+          ]
+        }
+      },
+      "required": [
+        "project_id",
+        "confirm_name"
+      ]
+    },
+    "annotations": {
+      "title": "Удалить дело",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "files_list",
+    "title": "Файлы ЮрИИста",
+    "description": "Файлы пользователя в ЮрИИсте (личное пространство): загруженные в хранилище, в дела и в чаты, новые первыми — file_id, имя, размер, дело, чат. Фильтры: имя (query), дело (project_id). Текст файла — file_read; вопрос по файлу — ask_yriist с file_ids.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Слова из имени файла.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "kind": {
+          "description": "library — хранилище и дела; attachment — временные вложения чатов.",
+          "type": "string",
+          "enum": [
+            "library",
+            "attachment"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "annotations": {
+      "title": "Файлы ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "file_read",
+    "title": "Прочитать файл",
+    "description": "Текст файла пользователя из ЮрИИста: PDF (со страницами «стр. N»), DOCX, DOC, RTF, таблицы, сканы и фото (распознавание текста). Скан читается дольше: если текст ещё не готов, придёт status=processing — вызовите file_read с тем же file_id через 20–30 секунд. Длинный текст — частями: from_char и max_chars.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "from_char": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 200000
+        },
+        "wait_seconds": {
+          "description": "Сколько ждать распознавания (по умолчанию 40 с).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "file_id"
+      ]
+    },
+    "annotations": {
+      "title": "Прочитать файл",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "anthropic/maxResultSizeChars": 200000
+    }
+  },
+  {
+    "name": "file_upload",
+    "title": "Загрузить файл (небольшой)",
+    "description": "Загружает небольшой файл (до 2.5 МБ) в ЮрИИст целиком в вызове — content_base64. Для файлов больше или если есть терминал — file_upload_begin (ссылка для PUT) и file_upload_finish. Файл попадает в хранилище пользователя (или в дело с project_id); дальше — file_read, ask_yriist с file_ids. PDF, DOCX, DOC, RTF, ODT, TXT, XLSX, сканы и фото.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Имя файла с расширением: «Договор поставки.pdf»."
+        },
+        "content_base64": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 3495262
+        },
+        "mime_type": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "name",
+        "content_base64"
+      ]
+    },
+    "annotations": {
+      "title": "Загрузить файл (небольшой)",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "file_upload_begin",
+    "title": "Начать загрузку файла",
+    "description": "Шаг 1 загрузки файла в ЮрИИст (до 300,0 МБ): проверяет место на тарифе и возвращает upload_url — загрузите файл туда HTTP PUT с заголовком Content-Type: <content_type из ответа> (например, curl -X PUT -H \"Content-Type: …\" --upload-file файл \"<upload_url>\"), затем вызовите file_upload_finish с upload_id. Ссылка действует час. Если такой файл уже есть (тот же sha256), PUT не нужен — сразу file_upload_finish. Без терминала и для файлов до 2,5 МБ — file_upload.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Имя файла с расширением: «Договор поставки.pdf»."
+        },
+        "size": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Размер в байтах."
+        },
+        "mime_type": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "sha256": {
+          "description": "SHA-256 файла (hex): тот же файл не загружается второй раз.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "name",
+        "size"
+      ]
+    },
+    "annotations": {
+      "title": "Начать загрузку файла",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "file_upload_finish",
+    "title": "Завершить загрузку файла",
+    "description": "Шаг 2 загрузки: регистрирует файл, загруженный по upload_url из file_upload_begin, и возвращает file_id. Повторный вызов с тем же upload_id вернёт тот же файл.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "upload_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "upload_id из file_upload_begin."
+        }
+      },
+      "required": [
+        "upload_id"
+      ]
+    },
+    "annotations": {
+      "title": "Завершить загрузку файла",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "documents_list",
+    "title": "Документы ЮрИИста",
+    "description": "Документы пользователя в «Документах» ЮрИИста (личное пространство): договоры, претензии, иски, созданные в чатах, из шаблонов или загруженные; новые по изменению первыми. Фильтры: название (query), вид (text — документ, sheet — таблица), дело (project_id), чат (chat_id). Текст — document_read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Слова из названия.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "sheet"
+          ]
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "chat_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        }
+      }
+    },
+    "annotations": {
+      "title": "Документы ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "document_read",
+    "title": "Прочитать документ",
+    "description": "Текст документа из «Документов» ЮрИИста по абзацам: каждый абзац с номером [n] — эти номера и цитаты использует document_edit. Длинный документ — частями: from_paragraph. Таблица — как CSV. Старая версия — version из document_versions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "from_paragraph": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "version": {
+          "description": "Версия (время) из document_versions.",
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 40
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 200000
+        }
+      },
+      "required": [
+        "document_id"
+      ]
+    },
+    "annotations": {
+      "title": "Прочитать документ",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "anthropic/maxResultSizeChars": 200000
+    }
+  },
+  {
+    "name": "document_versions",
+    "title": "Версии документа",
+    "description": "История версий документа, новые первыми: время версии (её id для document_read version и document_restore), название, размер.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        }
+      },
+      "required": [
+        "document_id"
+      ]
+    },
+    "annotations": {
+      "title": "Версии документа",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "document_create",
+    "title": "Создать документ в ЮрИИсте",
+    "description": "Сохраняет готовый текст (Markdown: заголовки, списки, таблицы, **жирный**) как документ в «Документы» ЮрИИста — там его можно править в редакторе, скачать DOCX/PDF (document_export), подписать и отправить. Можно сразу положить в дело (project_id). Считается в лимит создания документов тарифа. request_id (любой UUID) делает вызов безопасным для повтора: тот же request_id вернёт тот же документ.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200000,
+          "description": "Текст документа в Markdown."
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "request_id": {
+          "description": "UUID этой операции: повтор с ним не создаст второй документ.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "title",
+        "content"
+      ]
+    },
+    "annotations": {
+      "title": "Создать документ в ЮрИИсте",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "document_edit",
+    "title": "Править документ",
+    "description": "Вносит правки в документ из «Документов» ЮрИИста как написано — без пересказа другой моделью; получается новая версия (старая остаётся в document_versions). Сначала document_read: правки ссылаются на абзацы [n] и цитаты из него. Операции: replace (find → text), replace_paragraph (весь абзац → text), insert_after / insert_before (новые абзацы text после/перед абзацем с find), delete (удалить find), delete_paragraph. Каждая операция применяется сама по себе: что не подошло, вернётся с причиной и текущим текстом абзаца — повторите только её. Для правки «по смыслу» («смягчи ответственность») — ask_yriist с document_id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "edits": {
+          "minItems": 1,
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "replace",
+                  "replace_paragraph",
+                  "insert_after",
+                  "insert_before",
+                  "delete",
+                  "delete_paragraph"
+                ],
+                "description": "replace — find → text; replace_paragraph — весь абзац → text; insert_after / insert_before — новые абзацы text; delete — удалить find; delete_paragraph — весь абзац."
+              },
+              "paragraph": {
+                "description": "Абзац [n] по тексту до правки. Без него find должен встречаться в документе один раз.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "find": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600,
+                "description": "Цитата из абзаца символ в символ, без [n]: для replace и delete — что меняется, иначе — несколько слов, по которым абзац узнаётся."
+              },
+              "text": {
+                "description": "Абзацы — через перевод строки; **жирный**, *курсив*.",
+                "type": "string",
+                "maxLength": 8000
+              }
+            },
+            "required": [
+              "op",
+              "find"
+            ]
+          }
+        },
+        "base_revision": {
+          "description": "revision из document_read: правка не ляжет поверх чужого изменения.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "document_id",
+        "edits"
+      ]
+    },
+    "annotations": {
+      "title": "Править документ",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "document_update",
+    "title": "Переименовать или переместить документ",
+    "description": "Переименовывает документ (title) и/или кладёт его в дело (project_id; null — убрать из дела). Текст не меняется — для правок document_edit.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "document_id"
+      ]
+    },
+    "annotations": {
+      "title": "Переименовать или переместить документ",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "document_restore",
+    "title": "Восстановить версию документа",
+    "description": "Восстанавливает версию документа из document_versions: её текст становится новой текущей версией, вся история сохраняется (так отменяется неудачная правка).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 40,
+          "description": "Время версии из document_versions."
+        }
+      },
+      "required": [
+        "document_id",
+        "version"
+      ]
+    },
+    "annotations": {
+      "title": "Восстановить версию документа",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "document_export",
+    "title": "Скачать документ",
+    "description": "Готовит файл документа для скачивания: DOCX или PDF (таблица — XLSX или CSV) из последней сохранённой версии и возвращает ссылку на 7 дней. Ссылка открывает файл без входа — давайте её только пользователю.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "docx",
+            "pdf",
+            "xlsx",
+            "csv"
+          ]
+        }
+      },
+      "required": [
+        "document_id",
+        "format"
+      ]
+    },
+    "annotations": {
+      "title": "Скачать документ",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "document_delete",
+    "title": "Удалить документ",
+    "description": "Удаляет документ из «Документов» безвозвратно: все версии и файлы DOCX. Только по явной просьбе пользователя удалить документ.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[\\w-]+$"
+        }
+      },
+      "required": [
+        "document_id"
+      ]
+    },
+    "annotations": {
+      "title": "Удалить документ",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "templates_search",
+    "title": "Шаблоны документов",
+    "description": "Поиск по библиотеке из 230+ проверенных шаблонов ЮрИИста (договоры, иски, претензии, доверенности, заявления…). Смысловой поиск по query; без query — все шаблоны категории. Категории: Договоры, Исковые заявления, Претензии, Заявления, Доверенности, Акты, Расписки, Соглашения, Жалобы, Ходатайства и возражения, Согласия, Корпоративные документы, Уведомления, Кадровые документы, Письма и запросы, Коммерческие документы. Текст шаблона — template_read; копия в документы пользователя — document_from_template.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Договоры",
+            "Исковые заявления",
+            "Претензии",
+            "Заявления",
+            "Доверенности",
+            "Акты",
+            "Расписки",
+            "Соглашения",
+            "Жалобы",
+            "Ходатайства и возражения",
+            "Согласия",
+            "Корпоративные документы",
+            "Уведомления",
+            "Кадровые документы",
+            "Письма и запросы",
+            "Коммерческие документы"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        }
+      }
+    },
+    "annotations": {
+      "title": "Шаблоны документов",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "template_read",
+    "title": "Текст шаблона",
+    "description": "Полный текст шаблона из библиотеки ЮрИИста: структура, обязательные реквизиты, ссылки на нормы. Используй как основу документа.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "template_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "template_id"
+      ]
+    },
+    "annotations": {
+      "title": "Текст шаблона",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "anthropic/maxResultSizeChars": 200000
+    }
+  },
+  {
+    "name": "document_from_template",
+    "title": "Документ из шаблона",
+    "description": "Копирует шаблон из библиотеки в «Документы» пользователя (можно сразу в дело — project_id). Копия — как в шаблоне: заполните её через document_edit (по абзацам из document_read) или в редакторе ЮрИИста.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "template_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "template_id"
+      ]
+    },
+    "annotations": {
+      "title": "Документ из шаблона",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "deadlines_list",
+    "title": "Сроки",
+    "description": "Сроки пользователя из «Сроки» ЮрИИста: процессуальные и договорные, с последним днём, основанием (норма), делом и судебным делом. По умолчанию — открытые, ближайшие первыми. Фильтры: окно (today / week / overdue), даты, дело (project_id), судебное дело (case_id). Новый срок — deadline_save; изменить, выполнить, снять — deadline_update.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "done",
+            "dismissed",
+            "all"
+          ]
+        },
+        "window": {
+          "description": "today — сегодня, week — 7 дней, overdue — просроченные.",
+          "type": "string",
+          "enum": [
+            "today",
+            "week",
+            "overdue",
+            "all"
+          ]
+        },
+        "due_from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "due_to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "case_id": {
+          "description": "Судебное дело из cases_list.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 400
+        }
+      }
+    },
+    "annotations": {
+      "title": "Сроки",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/deadlines.html"
+      },
+      "ui/resourceUri": "ui://yriist/deadlines.html",
+      "openai/outputTemplate": "ui://yriist/deadlines.html"
+    }
+  },
+  {
+    "name": "deadline_save",
+    "title": "Сохранить срок",
+    "description": "Сохраняет срок в «Сроки» ЮрИИста с напоминаниями (push, email, календарь) — только по просьбе пользователя сохранить или напомнить. Два способа:\n1) Расчётный срок: rule (вид срока, как в calculate_deadline) или procedure + length_value, и event_date — последний день считает движок сроков по производственному календарю, а не модель.\n2) Срок с известной датой (договорной, «оплата до 15.12.2026»): title + due_date без rule.\nМожно привязать к делу (project_id) и судебному делу (case_id из cases_list). Такой же открытый срок не дублируется — вернётся существующий.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "description": "Вид срока (calculate_deadline).",
+          "type": "string",
+          "enum": [
+            "gpk.private_complaint",
+            "gpk.appeal",
+            "gpk.cassation",
+            "gpk.presidium_cassation",
+            "gpk.vs_cassation",
+            "gpk.supervision",
+            "gpk.simplified_appeal",
+            "gpk.simplified_motivated",
+            "gpk.zaochnoe_cancel",
+            "gpk.zaochnoe_appeal",
+            "gpk.court_order_objection",
+            "gpk.new_circumstances",
+            "apk.appeal",
+            "apk.cassation",
+            "apk.vs_cassation",
+            "apk.supervision",
+            "apk.ruling_appeal",
+            "apk.bankruptcy_ruling_appeal",
+            "bankruptcy.ruling_cassation",
+            "apk.simplified_appeal",
+            "apk.simplified_motivated",
+            "apk.new_circumstances",
+            "apk.pretrial_claim",
+            "kas.claim",
+            "kas.bailiff",
+            "kas.appeal",
+            "kas.private_complaint",
+            "kas.cassation",
+            "upk.appeal",
+            "koap.appeal",
+            "koap.fine_payment",
+            "gk.limitation",
+            "zozpp.refund",
+            "labor.dismissal",
+            "labor.dispute",
+            "labor.wage",
+            "ispr.complaint",
+            "ispr.voluntary"
+          ]
+        },
+        "procedure": {
+          "type": "string",
+          "enum": [
+            "gpk",
+            "apk",
+            "kas",
+            "upk",
+            "koap",
+            "gk",
+            "nk",
+            "bankruptcy",
+            "labor",
+            "ispr"
+          ]
+        },
+        "length_value": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 400
+        },
+        "length_unit": {
+          "type": "string",
+          "enum": [
+            "days",
+            "months",
+            "years"
+          ]
+        },
+        "day_kind": {
+          "type": "string",
+          "enum": [
+            "working",
+            "calendar"
+          ]
+        },
+        "event_date": {
+          "description": "Событие, от которого идёт срок.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "alt_event_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "due_date": {
+          "description": "Последний день срока с известной датой (без rule / procedure).",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "legal_basis": {
+          "description": "Норма или пункт договора.",
+          "type": "string",
+          "maxLength": 500
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "annotations": {
+      "title": "Сохранить срок",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/deadlines.html"
+      },
+      "ui/resourceUri": "ui://yriist/deadlines.html",
+      "openai/outputTemplate": "ui://yriist/deadlines.html"
+    }
+  },
+  {
+    "name": "deadline_update",
+    "title": "Изменить срок",
+    "description": "Меняет срок в «Сроки» ЮрИИста: отметить выполненным (status=done), снять с контроля (dismissed), вернуть в работу (open); поправить название, заметку, основание; новая дата начала (расчётный срок пересчитается) или новый последний день (срок с известной датой); привязать к делу или судебному делу; подтвердить дату («Дата верна», confirmed=true). Только по просьбе пользователя.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deadline_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "status": {
+          "description": "done — выполнен, dismissed — снять с контроля, open — вернуть в работу.",
+          "type": "string",
+          "enum": [
+            "open",
+            "done",
+            "dismissed"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "legal_basis": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trigger_date": {
+          "description": "Новая дата начала: расчётный срок пересчитается от неё.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "due_date": {
+          "description": "Новый последний день — только для срока с известной датой (без правила).",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "project_id": {
+          "description": "null — убрать из дела.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "case_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirmed": {
+          "description": "«Дата верна»: снимает отметку «уточните дату».",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "deadline_id"
+      ]
+    },
+    "annotations": {
+      "title": "Изменить срок",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/deadlines.html"
+      },
+      "ui/resourceUri": "ui://yriist/deadlines.html",
+      "openai/outputTemplate": "ui://yriist/deadlines.html"
+    }
+  },
+  {
+    "name": "deadline_delete",
+    "title": "Удалить срок",
+    "description": "Удаляет срок из «Сроков» ЮрИИста безвозвратно, с напоминаниями. Если срок просто выполнен или больше не нужен — лучше deadline_update со status=done или dismissed (останется в истории). Только по явной просьбе удалить.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deadline_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "deadline_id"
+      ]
+    },
+    "annotations": {
+      "title": "Удалить срок",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "deadline_complete",
+    "title": "Срок выполнен",
+    "description": "Устарело, используйте deadline_update. Отмечает срок выполненным (status=done), снимает с контроля (dismissed) или возвращает в работу (open).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deadline_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "done",
+            "dismissed",
+            "open"
+          ]
+        }
+      },
+      "required": [
+        "deadline_id"
+      ]
+    },
+    "annotations": {
+      "title": "Срок выполнен",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/deadlines.html"
+      },
+      "ui/resourceUri": "ui://yriist/deadlines.html",
+      "openai/outputTemplate": "ui://yriist/deadlines.html"
+    }
+  },
+  {
+    "name": "cases_list",
+    "title": "Дела на мониторинге",
+    "description": "Судебные дела, которые ЮрИИст отслеживает для пользователя: номер, суд, стороны, статус, последнее событие, открытые сроки, case_id. Карточка с актами и заседаниями — case_read; поставить новое — case_track; пауза или закрытие — case_update.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "paused",
+            "closed"
+          ]
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Дела на мониторинге",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "case_read",
+    "title": "Карточка дела",
+    "description": "Карточка отслеживаемого судебного дела: суд, стороны, статус мониторинга, все события (судебные акты со ссылками и кратким содержанием, заседания с датой, временем и залом) и сроки по делу.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "max_events": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [
+        "case_id"
+      ]
+    },
+    "annotations": {
+      "title": "Карточка дела",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "case_track",
+    "title": "Отслеживать дело",
+    "description": "Ставит судебное дело на мониторинг в ЮрИИсте: новые акты и заседания приходят уведомлением, сроки обжалования попадают в «Сроки». Номер и суд — из court_case. Для дел судов общей юрисдикции суд обязателен (номера повторяются). Если номер найден в нескольких судах, ответ перечислит их: спроси пользователя, какой его, и вызови case_update с court. Только по просьбе пользователя.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_number": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80,
+          "description": "«А40-12345/2026», «2-2628/2025»."
+        },
+        "court": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "uid": {
+          "description": "УИД, если известен.",
+          "type": "string",
+          "maxLength": 60
+        },
+        "title": {
+          "description": "Коротко: «Ромашка к Лютику о взыскании долга».",
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "case_number"
+      ]
+    },
+    "annotations": {
+      "title": "Отслеживать дело",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "case_update",
+    "title": "Изменить дело на мониторинге",
+    "description": "Меняет отслеживаемое судебное дело: пауза (status=paused), снова отслеживать (active), дело окончено (closed); название; суд (для номера, найденного в нескольких судах, — история загрузится заново); дело в «Делах» (project_id, null — убрать). Только по просьбе пользователя.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "paused",
+            "closed"
+          ]
+        },
+        "court": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 200
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 300
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "case_id"
+      ]
+    },
+    "annotations": {
+      "title": "Изменить дело на мониторинге",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "case_check",
+    "title": "Проверить дело сейчас",
+    "description": "«Проверить сейчас»: ЮрИИст сразу проверяет отслеживаемое дело в базе решений и на сайте суда (обычно это делается само по расписанию). Новые акты становятся событиями и сроками, как при плановой проверке. Не чаще 10 раз в час.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "case_id"
+      ]
+    },
+    "annotations": {
+      "title": "Проверить дело сейчас",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "case_delete",
+    "title": "Удалить дело с мониторинга",
+    "description": "Удаляет судебное дело из мониторинга безвозвратно, со всеми его событиями. Если дело просто закончилось — лучше case_update со status=closed (история останется). Только по явной просьбе удалить.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "case_id"
+      ]
+    },
+    "annotations": {
+      "title": "Удалить дело с мониторинга",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "review_tables_list",
+    "title": "Табличный анализ",
+    "description": "Таблицы «Табличного анализа» пользователя (сводная таблица по многим документам: строка — документ, колонка — вопрос): review_id, название, документов готово, ячеек на проверку. Содержимое — review_table_read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "annotations": {
+      "title": "Табличный анализ",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "review_table_read",
+    "title": "Таблица анализа",
+    "description": "Читает таблицу «Табличного анализа»: по каждому документу — ячейки колонок, комментарии, уверенность, ячейки на проверку, по желанию цитаты. Пока таблица заполняется, недоделанные документы помечены — перечитайте позже.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "review_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "columns": {
+          "description": "Названия колонок; по умолчанию все.",
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "documents": {
+          "description": "Части имён файлов; по умолчанию все.",
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "only_flagged": {
+          "description": "Только ячейки на проверку.",
+          "type": "boolean"
+        },
+        "quotes": {
+          "description": "С цитатами из документов.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "review_id"
+      ]
+    },
+    "annotations": {
+      "title": "Таблица анализа",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read",
+      "anthropic/maxResultSizeChars": 200000
+    }
+  },
+  {
+    "name": "review_table_create",
+    "title": "Создать табличный анализ",
+    "description": "Создаёт «Табличный анализ»: ЮрИИст сам читает каждый файл (file_ids из file_upload / files_list) и заполняет таблицу — строка на документ, колонка на вопрос (стороны, сроки, суммы, риски…). Колонки — готовый шаблон (template) или свои (columns: label + prompt). Таблица заполняется в фоне несколько минут: ответ придёт сразу с review_id, результат — review_table_read. Дорогая операция: на тарифе «Премиум», до 10 таблиц в час. Шаблоны:\n- contract_key_terms: Ключевые условия договоров — Любые договоры и дополнительные соглашения\n- contract_playbook: Проверка по стандартам компании — Договоры контрагентов на согласовании\n- supply: Договоры поставки — Договоры поставки, спецификации\n- lease: Договоры аренды — Договоры аренды помещений, зданий, земли, оборудования\n- employment: Трудовые договоры (ТК РФ) — Трудовые договоры и дополнительные соглашения к ним\n- nda: Соглашения о конфиденциальности (NDA) — NDA, соглашения о конфиденциальности\n- due_diligence: Due diligence договоров (M&A) — Договоры целевой компании из data room\n- primary_docs: Первичные документы (бухгалтерия) — Счета, УПД, акты, ТОРГ-12, счета-фактуры, акты сверки\n- court_acts: Судебные акты — Решения, постановления, определения судов\n- procurement: Госконтракты (44-ФЗ / 223-ФЗ) — Контракты и проекты контрактов\n- incoming: Входящие письма и претензии — Претензии, требования, уведомления, запросы госорганов, повестки",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_ids": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          }
+        },
+        "template": {
+          "type": "string",
+          "enum": [
+            "contract_key_terms",
+            "contract_playbook",
+            "supply",
+            "lease",
+            "employment",
+            "nda",
+            "due_diligence",
+            "primary_docs",
+            "court_acts",
+            "procurement",
+            "incoming"
+          ]
+        },
+        "columns": {
+          "maxItems": 30,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,40}$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "prompt": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "type": {
+                "default": "text",
+                "type": "string",
+                "enum": [
+                  "text",
+                  "quote",
+                  "date",
+                  "number",
+                  "money",
+                  "list",
+                  "yes_no",
+                  "choice",
+                  "risk",
+                  "check"
+                ]
+              },
+              "options": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "standard": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "document",
+                  "row"
+                ]
+              }
+            },
+            "required": [
+              "label"
+            ]
+          }
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "file_ids"
+      ]
+    },
+    "annotations": {
+      "title": "Создать табличный анализ",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write",
+      "ui": {
+        "resourceUri": "ui://yriist/list.html"
+      },
+      "ui/resourceUri": "ui://yriist/list.html",
+      "openai/outputTemplate": "ui://yriist/list.html"
+    }
+  },
+  {
+    "name": "memory_list",
+    "title": "Память ЮрИИста",
+    "description": "Что ЮрИИст помнит: факты о пользователе (profile), заметки этого подключения (connection), с project_id — факты дела, с chat_id — факты чата. С id — для memory_delete («забудь…», «что ты обо мне помнишь»).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "profile",
+            "project",
+            "connection",
+            "chat"
+          ],
+          "description": "profile — о пользователе (во всех чатах); project — факты дела (нужен project_id); connection — заметки этого подключения; chat — факты чата (нужен chat_id)."
+        },
+        "project_id": {
+          "description": "Дело: его факты.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "chat_id": {
+          "description": "Чат ЮрИИста: его факты вместо заметок подключения.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Память ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "memory_search",
+    "title": "Поиск в памяти ЮрИИста",
+    "description": "Ищет по смыслу в памяти ЮрИИста: факты о пользователе, заметки подключения, с project_id — факты дела (стороны, суммы, даты, номера, предпочтения). Весь список — memory_list. Переписку чатов ищет chats_search.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "profile",
+            "project",
+            "connection",
+            "chat"
+          ],
+          "description": "profile — о пользователе (во всех чатах); project — факты дела (нужен project_id); connection — заметки этого подключения; chat — факты чата (нужен chat_id)."
+        },
+        "project_id": {
+          "description": "Дело: его факты.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "chat_id": {
+          "description": "Чат ЮрИИста: его факты вместо заметок подключения.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "annotations": {
+      "title": "Поиск в памяти ЮрИИста",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:read",
+      "yriist/scope": "yriist:read"
+    }
+  },
+  {
+    "name": "memory_save",
+    "title": "Запомнить в ЮрИИсте",
+    "description": "Сохраняет факты в долговременную память ЮрИИста — только по просьбе пользователя запомнить. Каждый факт — самодостаточное утверждение с конкретикой («Работодатель — ООО «Ромашка», ИНН 7701234567»). scope: profile — о пользователе, ЮрИИст учтёт во всех чатах; project — факт дела (нужен project_id), учтётся во всех чатах дела; connection — заметка этого подключения.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "facts": {
+          "minItems": 1,
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fact": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 500
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "party",
+                  "document",
+                  "amount",
+                  "date",
+                  "law_citation",
+                  "court_reference",
+                  "legal_conclusion",
+                  "user_preference",
+                  "procedure",
+                  "general"
+                ]
+              },
+              "importance": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5,
+                "description": "5 — критично (стороны, суммы, сроки)."
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "profile",
+                  "project",
+                  "connection"
+                ]
+              }
+            },
+            "required": [
+              "fact",
+              "category",
+              "importance",
+              "scope"
+            ]
+          }
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "facts"
+      ]
+    },
+    "annotations": {
+      "title": "Запомнить в ЮрИИсте",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "memory_delete",
+    "title": "Забыть в ЮрИИсте",
+    "description": "Удаляет устаревшие или ошибочные факты из памяти ЮрИИста по id из memory_list / memory_search — когда пользователь просит забыть или факт изменился. Для фактов дела и чата передайте тот же project_id / chat_id, что при чтении.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ids": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200
+          }
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "project_id": {
+          "description": "Дело: его факты.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "chat_id": {
+          "description": "Чат ЮрИИста: его факты вместо заметок подключения.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "required": [
+        "ids"
+      ]
+    },
+    "annotations": {
+      "title": "Забыть в ЮрИИсте",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:write",
+      "yriist/scope": "yriist:write"
+    }
+  },
+  {
+    "name": "anonymize",
+    "title": "Обезличить текст",
+    "description": "Анонимайзер ЮрИИста: убирает персональные данные (ФИО, телефоны, адреса, паспорта, ИНН, счета, e-mail…) из текста или файла пользователя (file_id) и возвращает обезличенный текст с метками вроде [ФИО-1], [ТЕЛЕФОН-2] и сводку, что заменено. Исходные значения в ответ не включаются. Удобно перед тем, как передать документ дальше. Считается в лимит анонимайзера тарифа.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000000
+        },
+        "file_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Обезличить текст",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research"
+    }
+  },
+  {
+    "name": "web_search",
+    "title": "Поиск в интернете",
+    "description": "Поиск в российском интернете (Яндекс и др.) через ЮрИИст. До 4 запросов за вызов. Результаты с номерами [n] — откройте лучшие через web_fetch по номеру и опирайтесь на прочитанный текст, а не на сниппеты.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "queries": {
+          "minItems": 1,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "description": "3-7 слов, как юрист в Яндексе: институт + факт или номер нормы («статья 18 ЗоЗПП технически сложный товар возврат»). Без «официальный текст», года (кроме новых законов), сайтов. Разные запросы — разные аспекты, не перестановки."
+        },
+        "recency": {
+          "description": "Для новостей и недавних изменений.",
+          "type": "string",
+          "enum": [
+            "day",
+            "week",
+            "month",
+            "year"
+          ]
+        }
+      },
+      "required": [
+        "queries"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Поиск в интернете",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "web_fetch",
+    "title": "Чтение страниц",
+    "description": "Читает веб-страницы и документы по ссылке: результаты web_search, court_search и court_case по номеру [n] или любую публичную страницу по полному URL (http/https). Небольшие источники возвращаются целиком, большие — частями: укажи query, чтобы получить релевантные части, или parts с номерами частей. До 5 источников за вызов. Числа (проценты, суммы, сроки, даты) бери только из прочитанного текста. Страницы, где нужен вход, прочитать нельзя.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ],
+                "description": "Номер [n] или полный URL (от пользователя или с прочитанной страницы)."
+              },
+              "query": {
+                "description": "Что ищешь: вернутся релевантные части.",
+                "type": "string",
+                "maxLength": 300
+              },
+              "parts": {
+                "description": "Номера частей из прошлого чтения.",
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              }
+            },
+            "required": [
+              "ref"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Чтение страниц",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "court_search",
+    "title": "Судебная практика",
+    "description": "Судебная практика РФ по смыслу (СОЮ, арбитраж, ВС с Пленумами и обзорами, часть КСОЮ): лучшие решения [n] с мотивировкой и итогом. Дело по номеру, УИД или ссылке — court_case; полный текст решения — web_fetch по номеру [n] с query.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 400,
+          "description": "Одна фраза: кто, к кому, что требует, на каком основании — под позицию пользователя; довод оппонента ищи отдельным вызовом и называй практикой против. Без года, номеров, суда, судьи, слова «практика»."
+        },
+        "category": {
+          "description": "«Гражданское», «Административное» (КАС), «КоАП», «Уголовное», «Арбитраж», «Банкротство» (всё в деле о банкротстве — не «Арбитраж»). Не уверен — не указывай.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "court_level": {
+          "description": "Только если нужна одна инстанция: first — первая, appeal — апелляция, cassation — кассация (с category «Арбитраж» или «Банкротство» — арбитражные суды округов, иначе КСОЮ; КСОЮ в базе неполны: нет — web_search), supreme — ВС (когда просят практику ВС), constitutional — позиция КС.",
+          "type": "string",
+          "enum": [
+            "first",
+            "appeal",
+            "cassation",
+            "supreme",
+            "constitutional"
+          ]
+        },
+        "court": {
+          "description": "Суд, если пользователь его назвал: «Мосгорсуд», «13 ААС».",
+          "type": "string",
+          "maxLength": 120
+        },
+        "judge": {
+          "description": "Фамилия, вместе с court: все решения судьи по фильтрам.",
+          "type": "string",
+          "maxLength": 80
+        },
+        "article": {
+          "description": "Одна статья кодекса, можно с частью: «333 ГК», «ч. 4 ст. 159 УК». Только кодексы; законы — в query.",
+          "type": "string",
+          "maxLength": 40
+        },
+        "doc_type": {
+          "type": "string",
+          "enum": [
+            "приговор",
+            "решение",
+            "постановление",
+            "определение",
+            "апелляционное определение",
+            "апелляционное постановление",
+            "кассационное определение"
+          ]
+        },
+        "party": {
+          "description": "Организация-участник, если спрашивают о делах с ней: название без ОПФ или бренд. Тема — в query.",
+          "type": "string",
+          "maxLength": 120
+        },
+        "party_role": {
+          "description": "Роль party, если важна. Только с party.",
+          "type": "string",
+          "enum": [
+            "истец",
+            "ответчик",
+            "подсудимый",
+            "иное лицо"
+          ]
+        },
+        "date_from": {
+          "description": "Свежая практика — последние 2-3 года.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "date_to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "outcome": {
+          "description": "Нужный итог; иные вернутся отдельным блоком.",
+          "type": "string",
+          "enum": [
+            "satisfied",
+            "denied",
+            "reversed",
+            "upheld",
+            "convicted_real",
+            "convicted_suspended",
+            "convicted_other",
+            "acquitted",
+            "terminated"
+          ]
+        },
+        "list": {
+          "description": "true — все решения по фильтрам без поиска по смыслу, от новых («все приговоры суда по ст. 159 за год»).",
+          "type": "boolean"
+        },
+        "alt_queries": {
+          "description": "1-2 формулировки языком судебного акта: вывод суда («Суд приходит к выводу, что…») и/или фабула. Для поиска аналогов давай обе: синонимы и норму («ДНК» / «молекулярно-генетическая экспертиза», «ч. 3 ст. 79 ГПК»).",
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 400
+          }
+        },
+        "situation": {
+          "description": "Ситуация пользователя для сверки аналогов: кто к кому что требует, ключевой факт и кто его совершил («мать ребёнка требует установить отцовство, жив, ответчик-отец уклоняется от ДНК-экспертизы»). Стадию называй, только если сам вопрос процессуальный («отвод судье заявлен в апелляционном заседании по уголовному делу»); для спора по существу стадия и инстанция не нужны. Указывай, когда ищешь практику для его дела или документа: каждое решение получит отметку, та ли это ситуация.",
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 600
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Судебная практика",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "court_case",
+    "title": "Карточка дела",
+    "description": "Решение по номеру дела, УИД или ссылке: база с учётом суда и нижестоящей инстанции, иначе официальные сайты. Пользователь назвал дело — сначала court_case, не court_search.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "case_number": {
+          "description": "Как написал пользователь: «33-5347/2026 (2-2628/2025)», «34-КГ25-26-К3».",
+          "type": "string",
+          "maxLength": 80
+        },
+        "uid": {
+          "description": "«52RS0008-01-2025-001375-20».",
+          "type": "string",
+          "maxLength": 60
+        },
+        "url": {
+          "description": "Ссылка пользователя на решение (sudact.ru, сайт суда, vsrf.ru).",
+          "type": "string",
+          "maxLength": 500
+        },
+        "court": {
+          "description": "Суд, если известен (в т.ч. «7 КСОЮ»): номера дел повторяются в разных судах.",
+          "type": "string",
+          "maxLength": 120
+        },
+        "date": {
+          "description": "Дата акта, YYYY-MM-DD.",
+          "type": "string",
+          "maxLength": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Карточка дела",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "law_article",
+    "title": "Текст нормы",
+    "description": "Текст статьи кодекса или закона (или пункта Пленума ВС/ВАС) в действующей редакции, сверенный по нескольким источникам, с номером [n]. Знаешь акт и статью — бери здесь, не поиском. В базе кодексы, 96 основных законов (по номеру или названию: «127-ФЗ», «ЗоЗПП»), ПДД РФ (article — пункт: «12.4») и Пленумы (по номеру и дате). Закона нет в базе — укажи вид, дату и номер («Федеральный закон от 27.11.2018 № 422-ФЗ»), так найдётся и он; у постановления Правительства article — пункт утверждённых им Правил. В ответе «Рядом в этом акте»: если нужного (срока, суммы, условия, круга лиц, исключения) в статье нет, открой соседнюю, прежде чем отвечать.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "articles": {
+          "minItems": 1,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "act": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 200,
+                "description": "«ГК РФ», «44-ФЗ», «Пленум ВС № 7 от 24.03.2016»."
+              },
+              "article": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20,
+                "description": "«333.1» или пункт Пленума или постановления («31(1)»). Без «ст.» и частей."
+              },
+              "part": {
+                "description": "Часть или пункт статьи, если нужен только он.",
+                "type": "string",
+                "maxLength": 10
+              },
+              "query": {
+                "description": "Что ищешь в статье («рабочие дни»): длинная статья откроется на этом месте и покажет, каких слов в ней нет.",
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "act",
+              "article"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "articles"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Текст нормы",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "check_norms",
+    "title": "Актуальность норм",
+    "description": "Актуальность норм: по каждой ссылке в тексте — утратила силу (и что вместо), не вступила (с какой даты), недавно изменена, нет такой статьи или части. Передай текст (черновик, фрагмент договора; текст файла — из file_read) или список ссылок. ✗ — не приводи норму как действующую.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "description": "Черновик ответа или фрагмент документа.",
+          "type": "string",
+          "maxLength": 60000
+        },
+        "citations": {
+          "description": "Отдельные ссылки: «п. 2 ст. 450.1 ГК РФ».",
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 300
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Актуальность норм",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "verify_claims",
+    "title": "Проверка ссылок и цифр",
+    "description": "Проверка ссылок и цифр перед итоговым ответом на правовой вопрос: нормы, Пленумы и дела существуют, часть и подпункт есть, числа совпадают с текстом, решающая норма не специальная другая, итог дела верен. Выводы «нельзя / не вправе / обязан / не требуется / только» сверяет со всей статьёй — передавай их с нормой. Пересчитывает сроки (срок + дата начала + последний день), госпошлины и «a × b = c». ✗ — исправь вывод по тексту и проверь снова.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "claims": {
+          "minItems": 1,
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 700,
+            "description": "Утверждение ответа со ссылкой и цифрами, как напишешь: «Частная жалоба — 15 рабочих дней (ст. 332 ГПК РФ): определение от 01.09.2026, последний день 22.09.2026»."
+          },
+          "description": "Только утверждения со ссылкой на норму, Пленум, дело, со сроком с датой, госпошлиной или расчётом."
+        }
+      },
+      "required": [
+        "claims"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Проверка ссылок и цифр",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "company_lookup",
+    "title": "Карточка компании",
+    "description": "Карточка компании или ИП из ЕГРЮЛ/ЕГРИП: наименование, ИНН, ОГРН, КПП, адрес, руководитель, статус. По ИНН/ОГРН — точно, по названию — до 5 вариантов. Учредители, суды, долги, риски — company_check.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "ИНН, ОГРН/ОГРНИП (можно с КПП) или название с городом."
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Карточка компании",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "company_check",
+    "title": "Проверка контрагента",
+    "description": "Проверка контрагента по открытым реестрам: учредители, недостоверность, массовость, дисквалификация, РНП, санкции, банкротство, недоимка, суды, ФССП, отчётность, госзакупки, история изменений. Физлицо по ИНН (target=person) — где руководитель или учредитель. Платный: только когда просят проверить контрагента, оценить риски сделки или найти суды и долги; реквизиты — company_lookup.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "ИНН, ОГРН или ОГРНИП; по названию с городом при нескольких совпадениях вернутся варианты."
+        },
+        "target": {
+          "description": "person — физлицо (не ИП) по 12-значному ИНН. ИП — без target.",
+          "type": "string",
+          "enum": [
+            "organization",
+            "person"
+          ]
+        },
+        "sections": {
+          "description": "Для полной проверки не передавай — загружается всё. Только если спрашивают об одном: courts — арбитраж, contracts — госзакупки, bankruptcy — ЕФРСБ; enforcements (ФССП) и finances — только организации.",
+          "maxItems": 9,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "reliability",
+              "courts",
+              "enforcements",
+              "finances",
+              "fedresurs",
+              "contracts",
+              "inspections",
+              "history",
+              "bankruptcy"
+            ]
+          }
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Проверка контрагента",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "requisites_lookup",
+    "title": "Реквизиты",
+    "description": "Справочные реквизиты: bank — по БИК, ИНН или названию; court — по названию, коду или «судебный участок N город»; tax_office — по коду, названию или адресу; address — нормализация (индекс, ОКТМО, ОКАТО, ИФНС, кадастровый номер).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bank",
+            "court",
+            "tax_office",
+            "address"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300,
+          "description": "БИК, код, название или адрес."
+        }
+      },
+      "required": [
+        "kind",
+        "query"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Реквизиты",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": true,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "calculate_penalty",
+    "title": "Расчёт неустойки",
+    "description": "Проценты и неустойки за просрочку денежного обязательства по ключевой ставке: периоды, моратории, частичные оплаты, риск снижения по ст. 333 ГК.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "labor_236_tk",
+            "art_395",
+            "art_317_1",
+            "gov_contract_44fz",
+            "gov_contract_223fz",
+            "shared_construction_214fz",
+            "tax_penalty",
+            "housing_utility",
+            "consumer_protection_zozpp",
+            "contractual"
+          ],
+          "description": "labor_236_tk — задержка зарплаты (ст. 236 ТК, 1/150); art_317_1 — законные проценты; gov_contract_44fz — 1/300; shared_construction_214fz — застройщик; housing_utility — ЖКХ; contractual — договорная."
+        },
+        "debt_rub": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "start_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Первый день просрочки."
+        },
+        "end_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Включительно: сегодня или дата оплаты."
+        },
+        "subject": {
+          "type": "string",
+          "enum": [
+            "individual",
+            "legal_entity",
+            "entrepreneur"
+          ]
+        },
+        "payments": {
+          "description": "Частичные оплаты.",
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "amount_rub": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "date",
+              "amount_rub"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "contractual_rate_percent": {
+          "description": "Для contractual: 0.1 = 0,1%.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "contractual_rate_period": {
+          "type": "string",
+          "enum": [
+            "day",
+            "month",
+            "year"
+          ]
+        },
+        "zozpp_claim": {
+          "description": "service/work — 3% в день, sale — 1%.",
+          "type": "string",
+          "enum": [
+            "service",
+            "work",
+            "sale"
+          ]
+        },
+        "contract_price_rub": {
+          "description": "Для 44-ФЗ/223-ФЗ.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "type",
+        "debt_rub",
+        "start_date",
+        "end_date"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Расчёт неустойки",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "calculate_court_fee",
+    "title": "Расчёт госпошлины",
+    "description": "Госпошлина по действующему НК РФ (ст. 333.19, 333.21) с льготами. Ставка зависит от вида производства, не от суда: жалоба в ВС — supreme_court_complaint с court по виду дела. Моральный вред — не в claim_amount_rub, а в non_property_claims. КБК не называй: реквизиты — на сайте суда.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "court": {
+          "type": "string",
+          "enum": [
+            "general_jurisdiction",
+            "administrative",
+            "arbitration",
+            "supreme"
+          ],
+          "description": "general_jurisdiction — ГПК; administrative — КАС; arbitration — АПК и банкротство (и жалобы в ВС по ним); supreme — ВС как 1-я инстанция."
+        },
+        "claim": {
+          "type": "string",
+          "enum": [
+            "property",
+            "non_property",
+            "administrative_action",
+            "administrative_normative",
+            "family_divorce",
+            "family_alimony",
+            "family_property_division",
+            "appeal_appellate",
+            "appeal_cassation",
+            "supreme_court_complaint",
+            "private_complaint",
+            "review_new_circumstances",
+            "restore_term_motion",
+            "restore_execution_term",
+            "court_order",
+            "interim_measures",
+            "special_proceeding",
+            "bankruptcy",
+            "bankruptcy_separate_dispute"
+          ],
+          "description": "appeal_cassation — в кассационный суд; supreme_court_complaint — кассационная или надзорная жалоба в ВС; bankruptcy_separate_dispute — требование в деле о банкротстве."
+        },
+        "separate_dispute_claim": {
+          "description": "Для bankruptcy_separate_dispute; property — с claim_amount_rub.",
+          "type": "string",
+          "enum": [
+            "property",
+            "non_property"
+          ]
+        },
+        "payer": {
+          "type": "string",
+          "enum": [
+            "individual",
+            "entrepreneur",
+            "organization"
+          ]
+        },
+        "bankruptcy_applicant": {
+          "description": "Для bankruptcy: debtor — о своём банкротстве (без пошлины), creditor — кредитор или уполномоченный орган.",
+          "type": "string",
+          "enum": [
+            "debtor",
+            "creditor"
+          ]
+        },
+        "claim_amount_rub": {
+          "description": "Цена имущественного иска: долг, проценты, неустойка; без морального вреда и расходов.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "non_property_claims": {
+          "description": "Неимущественные требования в том же иске (моральный вред — 1).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "payer_status": {
+          "description": "Льгота: consumer — иск по ЗоЗПП, labor_dispute — трудовой спор работника.",
+          "type": "string",
+          "enum": [
+            "none",
+            "veteran",
+            "disabled_1_2",
+            "consumer",
+            "pensioner_pfr",
+            "labor_dispute"
+          ]
+        },
+        "filing_date": {
+          "description": "По умолчанию сегодня.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "required": [
+        "court",
+        "claim",
+        "payer"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Расчёт госпошлины",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "calculate_deadline",
+    "title": "Расчёт процессуального срока",
+    "description": "Срок по производственному календарю РФ (2020–2027): дни по правилу кодекса, месяцы, годы, перенос с выходных, статус на сегодня. Любой срок с датой считай здесь, не в уме. Неясно, от какого события считать (вынесение, полный текст, получение копии), — передай обе даты. rule: кодекс.вид; cassation — в КСОЮ или АС округа, presidium_cassation — в президиум областного суда, vs_cassation — в СК ВС, simplified_motivated — заявление о мотивированном решении. Нет правила — procedure и length_value/length_unit.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rule": {
+          "description": "Готовое правило.",
+          "type": "string",
+          "enum": [
+            "gpk.private_complaint",
+            "gpk.appeal",
+            "gpk.cassation",
+            "gpk.presidium_cassation",
+            "gpk.vs_cassation",
+            "gpk.supervision",
+            "gpk.simplified_appeal",
+            "gpk.simplified_motivated",
+            "gpk.zaochnoe_cancel",
+            "gpk.zaochnoe_appeal",
+            "gpk.court_order_objection",
+            "gpk.new_circumstances",
+            "apk.appeal",
+            "apk.cassation",
+            "apk.vs_cassation",
+            "apk.supervision",
+            "apk.ruling_appeal",
+            "apk.bankruptcy_ruling_appeal",
+            "bankruptcy.ruling_cassation",
+            "apk.simplified_appeal",
+            "apk.simplified_motivated",
+            "apk.new_circumstances",
+            "apk.pretrial_claim",
+            "kas.claim",
+            "kas.bailiff",
+            "kas.appeal",
+            "kas.private_complaint",
+            "kas.cassation",
+            "upk.appeal",
+            "koap.appeal",
+            "koap.fine_payment",
+            "gk.limitation",
+            "zozpp.refund",
+            "labor.dismissal",
+            "labor.dispute",
+            "labor.wage",
+            "ispr.complaint",
+            "ispr.voluntary"
+          ]
+        },
+        "procedure": {
+          "description": "Без rule: кодекс, по которому считать дни.",
+          "type": "string",
+          "enum": [
+            "gpk",
+            "apk",
+            "kas",
+            "upk",
+            "koap",
+            "gk",
+            "nk",
+            "bankruptcy",
+            "labor",
+            "ispr"
+          ]
+        },
+        "length_value": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 400
+        },
+        "length_unit": {
+          "type": "string",
+          "enum": [
+            "days",
+            "months",
+            "years"
+          ]
+        },
+        "day_kind": {
+          "description": "Только если норма прямо задаёт вид дней иначе, чем кодекс.",
+          "type": "string",
+          "enum": [
+            "working",
+            "calendar"
+          ]
+        },
+        "event_date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Событие, от которого идёт срок."
+        },
+        "challenged_act": {
+          "description": "Для жалобы — что обжалуется; срок проверяется по акту (на апелляционное определение — только кассация). decision — не вступившие в силу решение, постановление по АП, приговор; appellate_ruling — апелляционный акт (в т.ч. по правилам 1-й инстанции); district_appellate_ruling — районного суда по делу мирового; effective_decision — вступившее в силу постановление по АП.",
+          "type": "string",
+          "enum": [
+            "decision",
+            "simplified_decision",
+            "zaochnoe_decision",
+            "ruling",
+            "court_order",
+            "appellate_ruling",
+            "district_appellate_ruling",
+            "cassation_ruling",
+            "effective_decision"
+          ]
+        },
+        "alt_event_date": {
+          "description": "Другое возможное начальное событие. Для «со дня, когда узнал»: в event_date дата документа, здесь — дата получения.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "required": [
+        "event_date"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Расчёт процессуального срока",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  },
+  {
+    "name": "calculate",
+    "title": "Точный расчёт",
+    "description": "Точная арифметика (суммы, доли, проценты, деньги до копейки): каждое число ответа бери отсюда. Шаг — формула с числами и именами прошлых шагов. Десятичная запятая («0,4484»), «%» — сотая доля, round(x; 2), min, max; без round не округляет. Метод (method) выбираешь ты; есть расчёт пользователя — сначала воспроизведи его, другой метод — только с нормой или практикой.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 1000,
+          "description": "Словами: «доля = площадь комнаты / общая площадь; компенсация = стоимость × доля»."
+        },
+        "steps": {
+          "minItems": 1,
+          "maxItems": 40,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "Без пробелов: «доля»."
+              },
+              "expr": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300,
+                "description": "«4211000 * доля», «round(x; 2)»."
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "rub",
+                  "percent",
+                  "share",
+                  "number",
+                  "days"
+                ]
+              },
+              "label": {
+                "description": "Подпись для таблицы.",
+                "type": "string",
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "name",
+              "expr"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "share_denominator": {
+          "description": "Показать доли и как k/знаменатель.",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "sum_check": {
+          "description": "Шаги-доли, сумма которых должна быть 1.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "method",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Точный расчёт",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false,
+      "idempotentHint": true
+    },
+    "_meta": {
+      "ru.yriist/scope": "yriist:research",
+      "yriist/scope": "yriist:research",
+      "ui": {
+        "resourceUri": "ui://yriist/research.html"
+      },
+      "ui/resourceUri": "ui://yriist/research.html",
+      "openai/outputTemplate": "ui://yriist/research.html"
+    }
+  }
+]

@@ -1,7 +1,7 @@
 {
   "name": "@yriist/mcp",
-  "version": "1.0.0",
-  "description": "ЮрИИст MCP: ИИ-юрист по праву РФ для любого MCP-клиента (Claude, Cursor, VS Code, Windsurf, ChatGPT, Zed…). Stdio-мост к https://app.yriist.ru/api/mcp с входом через OAuth.",
+  "version": "1.1.0",
+  "description": "ЮрИИст MCP: ИИ-юрист по праву РФ для любого MCP-клиента (Claude, Cursor, VS Code, Windsurf, ChatGPT, Zed, Codex…). Stdio-мост к https://app.yriist.ru/api/mcp с входом через OAuth.",
   "type": "module",
   "bin": {
     "yriist-mcp": "bin/yriist-mcp.mjs"
